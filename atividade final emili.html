@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head><base href="https://d16ilfvy4mv02r.cloudfront.net/workspaces/yW0Vcl6GMSKsVQMDcbJhoPdMb1s36qzq/f5595601-bf75-4a5e-be68-45b2c7990a95/files/">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StyleWave Moda</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; }
+    .page-fade { animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    /* ── Validações ── */
+    const validarNome      = v => /^[A-Za-zÀ-ÿ]+(\s[A-Za-zÀ-ÿ]+)+$/.test(v.trim()) ? "" : "Informe nome e sobrenome";
+    const validarEmail     = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "E-mail inválido";
+    const validarCpf       = v => v.replace(/\D/g,"").length === 11 ? "" : "CPF deve ter 11 dígitos";
+    const validarIdade     = v => Number(v) >= 18 && Number(v) <= 120 ? "" : "Idade entre 18 e 120";
+    const validarSenha     = v => v.length >= 6 ? "" : "Mínimo 6 caracteres";
+    const validarConfirmar = (s,c) => s === c ? "" : "Senhas não conferem";
+
+    function Navbar({ pagina, setPagina }) {
+      const links = [
+        { id: "inicio",   label: "🏠 Início"   },
+        { id: "cadastro", label: "📝 Cadastro" },
+        { id: "usuarios", label: "👥 Usuários" },
+        { id: "cep",      label: "📍 CEP"      },
+      ];
+      return (
+        <nav className="bg-gray-900 flex flex-row flex-wrap md:flex-col md:w-56 w-full shrink-0">
+          <div className="hidden md:flex items-center justify-center py-5 border-b border-gray-700">
+            <span className="text-white font-bold text-lg tracking-wide">StyleWave</span>
+          </div>
+          {links.map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setPagina(id)}
+              className={
+                "flex-1 md:flex-none text-left px-5 py-4 text-sm font-medium transition-colors " +
+                (pagina === id
+                  ? "bg-indigo-600 text-white"
+                  : "text-gray-300 hover:bg-gray-700 hover:text-white")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      );
+    }
+
+    function Header() {
+      return (
+        <header className="bg-gray-900 text-white text-center py-4 shadow">
+          <h1 className="text-2xl font-bold tracking-wide">StyleWave Moda</h1>
+          <p className="text-gray-400 text-sm mt-1">Sua loja de moda online</p>
+        </header>
+      );
+    }
+
+    function ProductCard({ produto, tamanho, preco }) {
+      return (
+        <tr className="hover:bg-indigo-50 transition-colors">
+          <td className="border border-gray-200 px-4 py-3">{produto}</td>
+          <td className="border border-gray-200 px-4 py-3 text-gray-500">{tamanho}</td>
+          <td className="border border-gray-200 px-4 py-3 font-semibold text-indigo-700">{preco}</td>
+        </tr>
+      );
+    }
+
+    function FormInput({ id, type = "text", placeholder, value, onChange, error, touched }) {
+      const border = touched
+        ? (error ? "border-red-500" : "border-green-500")
+        : "border-gray-300";
+      return (
+        <div className="mb-4">
+          <input
+            id={id}
+            type={type}
+            placeholder={placeholder}
+            value={value}
+            onChange={onChange}
+            autoComplete="off"
+            className={"w-full px-3 py-2 border-2 rounded-lg outline-none transition-colors " + border}
+          />
+          {touched && error  && <small className="text-red-500 text-xs mt-1 block">{error}</small>}
+          {touched && !error && <small className="text-green-600 text-xs mt-1 block">✓ Válido</small>}
+        </div>
+      );
+    }
+
+    function UserRow({ usuario, index, onEdit, onDelete }) {
+      return (
+        <tr className="hover:bg-gray-50 transition-colors">
+          <td className="border border-gray-200 px-4 py-3">{usuario.nome}</td>
+          <td className="border border-gray-200 px-4 py-3">{usuario.email}</td>
+          <td className="border border-gray-200 px-4 py-3 font-mono text-sm">{usuario.cpf}</td>
+          <td className="border border-gray-200 px-4 py-3 whitespace-nowrap">
+            <button
+              onClick={() => onEdit(index)}
+              className="bg-indigo-100 hover:bg-indigo-600 hover:text-white text-indigo-700 text-xs font-semibold px-3 py-1 rounded mr-2 transition-colors"
+            >✏️ Editar</button>
+            <button
+              onClick={() => onDelete(index)}
+              className="bg-red-100 hover:bg-red-600 hover:text-white text-red-700 text-xs font-semibold px-3 py-1 rounded transition-colors"
+            >🗑️ Excluir</button>
+          </td>
+        </tr>
+      );
+    }
+
+    function CepField({ label, value }) {
+      return (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</label>
+          <input
+            readOnly
+            value={value}
+            placeholder={label + "..."}
+            className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-gray-50 text-gray-700"
+          />
+        </div>
+      );
+    }
+
+    const PRODUTOS = [
+      { produto: "Camiseta Básica",  tamanho: "P, M, G, GG",    preco: "R$ 49,90"  },
+      { produto: "Calça Jeans",      tamanho: "38, 40, 42, 44", preco: "R$ 159,90" },
+      { produto: "Jaqueta Couro",    tamanho: "P, M, G",        preco: "R$ 299,90" },
+      { produto: "Tênis Casual",     tamanho: "37 ao 44",       preco: "R$ 189,90" },
+    ];
+
+    function HomePage() {
+      useEffect(() => { document.title = "StyleWave — Início"; }, []);
+      return (
+        <div className="p-6 page-fade">
+          <h2 className="text-2xl font-bold mb-5 text-gray-700">Nossos Produtos</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <img
+              src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=700&q=80"
+              alt="Camisetas"
+              className="w-full rounded-xl shadow-md object-cover max-h-64"
+            />
+            <img
+              src="https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=700&q=80"
+              alt="Calças"
+              className="w-full rounded-xl shadow-md object-cover max-h-64"
+            />
+          </div>
+          <h2 className="text-xl font-bold mb-3 text-gray-700">Tabela de Produtos</h2>
+          <div className="overflow-x-auto rounded-xl shadow">
+            <table className="w-full border-collapse bg-white">
+              <thead>
+                <tr className="bg-gray-900 text-white">
+                  <th className="px-4 py-3 text-left">Produto</th>
+                  <th className="px-4 py-3 text-left">Tamanho</th>
+                  <th className="px-4 py-3 text-left">Preço</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PRODUTOS.map((p, i) => <ProductCard key={i} {...p} />)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    const FORM_VAZIO = { nome: "", email: "", cpf: "", idade: "", senha: "", confirmar: "" };
+
+    function CadastroPage({ usuarios, setUsuarios, setPagina, editIdx, setEditIdx }) {
+      const [form,    setForm]    = useState(FORM_VAZIO);
+      const [touched, setTouched] = useState({});
+      const [sucesso, setSucesso] = useState(false);
+
+      useEffect(() => {
+        document.title = "StyleWave — Cadastro";
+        if (editIdx !== null && usuarios[editIdx]) {
+          setForm({ ...usuarios[editIdx], senha: "", confirmar: "" });
+        } else {
+          setForm(FORM_VAZIO);
+          setTouched({});
+        }
+      }, [editIdx]);
+
+      const erros = {
+        nome:      validarNome(form.nome),
+        email:     validarEmail(form.email),
+        cpf:       validarCpf(form.cpf),
+        idade:     validarIdade(form.idade),
+        senha:     validarSenha(form.senha),
+        confirmar: validarConfirmar(form.senha, form.confirmar),
+      };
+
+      const formValido = Object.values(erros).every(e => e === "");
+
+      const handleChange = field => e => {
+        setForm(prev => ({ ...prev, [field]: e.target.value }));
+        setTouched(prev => ({ ...prev, [field]: true }));
+      };
+
+      const handleSubmit = e => {
+        e.preventDefault();
+        setTouched({ nome:true, email:true, cpf:true, idade:true, senha:true, confirmar:true });
+        if (!formValido) return;
+
+        const { confirmar, ...user } = form;
+        let updated;
+        if (editIdx !== null) {
+          updated = [...usuarios];
+          updated[editIdx] = user;
+        } else {
+          updated = [...usuarios, user];
+        }
+        localStorage.setItem("usuarios", JSON.stringify(updated));
+        setUsuarios(updated);
+        setSucesso(true);
+        setTimeout(() => {
+          setSucesso(false);
+          setEditIdx(null);
+          setForm(FORM_VAZIO);
+          setTouched({});
+          setPagina("usuarios");
+        }, 1200);
+      };
+
+      const handleCancelar = () => {
+        setEditIdx(null);
+        setForm(FORM_VAZIO);
+        setTouched({});
+      };
+
+      return (
+        <div className="p-6 page-fade max-w-lg mx-auto">
+          <h2 className="text-2xl font-bold mb-5 text-gray-700">
+            {editIdx !== null ? "✏️ Editar Usuário" : "📝 Novo Cadastro"}
+          </h2>
+
+          {sucesso && (
+            <div className="mb-4 bg-green-100 text-green-700 border border-green-300 rounded-lg px-4 py-3 text-sm font-medium">
+              ✅ {editIdx !== null ? "Usuário atualizado" : "Cadastro realizado"} com sucesso!
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} noValidate className="bg-white p-6 rounded-xl shadow">
+            <FormInput id="nome"      placeholder="Nome completo"            value={form.nome}      onChange={handleChange("nome")}      error={erros.nome}      touched={touched.nome}      />
+            <FormInput id="email"     type="email" placeholder="E-mail"      value={form.email}     onChange={handleChange("email")}     error={erros.email}     touched={touched.email}     />
+            <FormInput id="cpf"       placeholder="CPF (somente números)"    value={form.cpf}       onChange={handleChange("cpf")}       error={erros.cpf}       touched={touched.cpf}       />
+            <FormInput id="idade"     type="number" placeholder="Idade"      value={form.idade}     onChange={handleChange("idade")}     error={erros.idade}     touched={touched.idade}     />
+            <FormInput id="senha"     type="password" placeholder="Senha"    value={form.senha}     onChange={handleChange("senha")}     error={erros.senha}     touched={touched.senha}     />
+            <FormInput id="confirmar" type="password" placeholder="Confirmar senha" value={form.confirmar} onChange={handleChange("confirmar")} error={erros.confirmar} touched={touched.confirmar} />
+
+            <div className="flex gap-3 mt-2">
+              <button
+                type="submit"
+                className={"flex-1 py-2 rounded-lg font-semibold text-white transition-colors " +
+                  (formValido ? "bg-indigo-600 hover:bg-indigo-800" : "bg-indigo-300 cursor-not-allowed")}
+              >
+                {editIdx !== null ? "💾 Salvar" : "✅ Cadastrar"}
+              </button>
+              {editIdx !== null && (
+                <button
+                  type="button"
+                  onClick={handleCancelar}
+                  className="flex-1 py-2 rounded-lg bg-gray-400 hover:bg-gray-600 text-white font-semibold transition-colors"
+                >✖ Cancelar</button>
+              )}
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    function UsuariosPage({ usuarios, setUsuarios, setPagina, setEditIdx }) {
+      const [busca, setBusca] = useState("");
+
+      useEffect(() => {
+        document.title = "StyleWave — Usuários (" + usuarios.length + ")";
+      }, [usuarios]);
+
+      const handleEdit = useCallback(i => {
+        setEditIdx(i);
+        setPagina("cadastro");
+      }, []);
+
+      const handleDelete = useCallback(i => {
+        if (!window.confirm('Excluir "' + usuarios[i].nome + '"?')) return;
+        const updated = usuarios.filter((_, idx) => idx !== i);
+        localStorage.setItem("usuarios", JSON.stringify(updated));
+        setUsuarios(updated);
+      }, [usuarios]);
+
+      const filtrados = usuarios.filter(u =>
+        u.nome.toLowerCase().includes(busca.toLowerCase()) ||
+        u.email.toLowerCase().includes(busca.toLowerCase())
+      );
+
+      return (
+        <div className="p-6 page-fade">
+          <h2 className="text-2xl font-bold mb-4 text-gray-700">👥 Usuários Cadastrados</h2>
+
+          <input
+            placeholder="🔍 Buscar por nome ou e-mail..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            className="w-full md:w-80 px-4 py-2 border-2 border-gray-300 rounded-lg mb-5 outline-none focus:border-indigo-500 transition-colors"
+          />
+
+          {filtrados.length === 0 ? (
+            <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
+              <p className="text-4xl mb-2">📭</p>
+              <p>{busca ? "Nenhum resultado encontrado." : "Nenhum usuário cadastrado ainda."}</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl shadow">
+              <table className="w-full border-collapse bg-white">
+                <thead>
+                  <tr className="bg-gray-900 text-white">
+                    <th className="px-4 py-3 text-left">Nome</th>
+                    <th className="px-4 py-3 text-left">E-mail</th>
+                    <th className="px-4 py-3 text-left">CPF</th>
+                    <th className="px-4 py-3 text-left">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtrados.map((u, i) => (
+                    <UserRow
+                      key={i}
+                      usuario={u}
+                      index={usuarios.indexOf(u)}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="text-xs text-gray-400 mt-4">
+            Total: {usuarios.length} usuário(s) — dados salvos no LocalStorage
+          </p>
+        </div>
+      );
+    }
+
+    function CepPage() {
+      const [cep,      setCep]      = useState("");
+      const [endereco, setEndereco] = useState({ cep:"", rua:"", bairro:"", cidade:"", estado:"" });
+      const [erro,     setErro]     = useState("");
+      const [loading,  setLoading]  = useState(false);
+
+      useEffect(() => { document.title = "StyleWave — CEP"; }, []);
+
+      const buscarCep = async () => {
+        const limpo = cep.replace(/\D/g, "");
+        if (limpo.length !== 8) { setErro("CEP deve ter 8 dígitos."); return; }
+        setLoading(true);
+        setErro("");
+        setEndereco({ cep:"", rua:"", bairro:"", cidade:"", estado:"" });
+        try {
+          const res  = await fetch("https://viacep.com.br/ws/" + limpo + "/json/");
+          const data = await res.json();
+          if (data.erro) {
+            setErro("CEP não encontrado.");
+          } else {
+            setEndereco({ cep: data.cep, rua: data.logradouro, bairro: data.bairro, cidade: data.localidade, estado: data.uf });
+          }
+        } catch {
+          setErro("Erro de conexão. Verifique sua internet.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="p-6 page-fade max-w-lg mx-auto">
+          <h2 className="text-2xl font-bold mb-5 text-gray-700">📍 Consulta de CEP</h2>
+          <div className="bg-white p-6 rounded-xl shadow">
+            <div className="flex gap-2 mb-3">
+              <input
+                placeholder="Ex: 01310100"
+                value={cep}
+                onChange={e => setCep(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && buscarCep()}
+                maxLength={9}
+                className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg outline-none focus:border-indigo-500 transition-colors"
+              />
+              <button
+                onClick={buscarCep}
+                disabled={loading}
+                className="bg-indigo-600 hover:bg-indigo-800 disabled:bg-indigo-300 text-white font-semibold px-4 py-2 rounded-lg transition-colors"
+              >
+                {loading ? "⏳" : "Buscar"}
+              </button>
+            </div>
+            {erro && <p className="text-red-500 text-sm mb-3">❌ {erro}</p>}
+            {endereco.cidade && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                <CepField label="CEP"    value={endereco.cep}    />
+                <CepField label="Rua"    value={endereco.rua}    />
+                <CepField label="Bairro" value={endereco.bairro} />
+                <CepField label="Cidade" value={endereco.cidade} />
+                <CepField label="Estado" value={endereco.estado} />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
+    function App() {
+      const [pagina,   setPagina]   = useState("inicio");
+      const [usuarios, setUsuarios] = useState(() => {
+        try { return JSON.parse(localStorage.getItem("usuarios")) || []; }
+        catch { return []; }
+      });
+      const [editIdx, setEditIdx] = useState(null);
+
+      const renderPagina = () => {
+        switch (pagina) {
+          case "inicio":
+            return <HomePage />;
+          case "cadastro":
+            return <CadastroPage usuarios={usuarios} setUsuarios={setUsuarios} setPagina={setPagina} editIdx={editIdx} setEditIdx={setEditIdx} />;
+          case "usuarios":
+            return <UsuariosPage usuarios={usuarios} setUsuarios={setUsuarios} setPagina={setPagina} setEditIdx={setEditIdx} />;
+          case "cep":
+            return <CepPage />;
+          default:
+            return <HomePage />;
+        }
+      };
+
+      return (
+        <div className="flex flex-col md:flex-row min-h-screen">
+          <Navbar pagina={pagina} setPagina={setPagina} />
+          <div className="flex-1 flex flex-col">
+            <Header />
+            <main className="flex-1 bg-gray-50">
+              {renderPagina()}
+            </main>
+            <footer className="bg-gray-900 text-gray-400 text-center text-xs py-3">
+              © 2025 StyleWave Moda — React + Tailwind CSS
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
